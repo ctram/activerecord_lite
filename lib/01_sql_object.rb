@@ -40,14 +40,16 @@ class SQLObject
   end
 
   def self.all
-    objects = DBConnection.execute(<<-SQL)
+    arr = DBConnection.execute(<<-SQL)
       SELECT
         *
       FROM
         #{table_name}
     SQL
 
-    objects
+    arr.map do |params|
+      self.new(params)
+    end
 
   end
 
@@ -62,13 +64,27 @@ class SQLObject
   end
 
   def self.find(id)
-    # ...
+    params = DBConnection.execute(<<-SQL, id)
+      SELECT
+        *
+      FROM
+        #{table_name}
+      WHERE
+        id = ?
+    SQL
+
+    if params == []
+      return nil
+    else
+      self.new(params.first)
+    end
   end
 
   def initialize(params = {})
 
     params.each do |attr_name, val|
-      if !self.class.columns.include?(attr_name)
+
+      if !self.class.columns.include?(attr_name.to_sym)
         raise "unknown attribute '#{attr_name}'"
       else
         attr_name_setter= "#{attr_name}=".to_sym
@@ -78,16 +94,26 @@ class SQLObject
   end
 
   def attributes
-    # ...
     @attributes ||= {}
   end
 
   def attribute_values
-    # ...
+    attributes.values
   end
 
   def insert
-    # ...
+    attr_names = attributes.keys
+    attr_names.map!{ |attr_name| attr_name.to_s}
+    num_attrs = attr_names.length
+    attr_names = attr_names.join(', ')
+    question_marks = Array.new(num_attrs){"?"}.join(", ")
+    # byebug
+    DBConnection.execute(<<-SQL, *attr_names)
+      INSERT INTO
+        #{self.class.table_name} (#{attr_names})
+      VALUES
+        (#{question_marks})
+    SQL
   end
 
   def update
